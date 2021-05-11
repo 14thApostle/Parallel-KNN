@@ -105,7 +105,7 @@ model.compile(
 )
 model.summary()
 
-epochs = 20
+epochs = 2
 history = model.fit(train_ds, validation_data=val_ds, epochs=epochs)
 
 acc = history.history["accuracy"]
@@ -153,6 +153,8 @@ os.makedirs(join(root_path, "test"))
 ## Train
 correct = 0
 total = 0
+
+f1 = open(join(root_path, "train" + ".txt"), "w")
 for class_name in os.listdir(train_dir):
     print("Converting train", class_name, "images")
     label = class_names.index(class_name)
@@ -173,17 +175,23 @@ for class_name in os.listdir(train_dir):
             )
         )
         for val in ftr_vector.flatten():
-            f.write(str(val) + "\n")
+            f.write(str(val) + " ")
         f.close()
+
+        for val in ftr_vector.flatten():
+            f1.write(str(val) + " ")
+        f1.write(str(class_names.index(class_name)) + "\n")
 
         if output == label:
             correct += 1
         total += 1
+f1.close()
 print("Train accuracy", correct / total)
 
 ## Test
 correct = 0
 total = 0
+f1 = open(join(root_path, "test" + ".txt"), "w")
 for class_name in os.listdir(test_dir):
     print("Converting test", class_name, "images")
     label = class_names.index(class_name)
@@ -204,11 +212,15 @@ for class_name in os.listdir(test_dir):
             )
         )
         for val in ftr_vector.flatten():
-            f.write(str(val) + "\n")
+            f.write(str(val) + " ")
         f.close()
+
+        for val in ftr_vector.flatten():
+            f1.write(str(val) + " ")
+        f1.write(str(class_names.index(class_name)) + "\n")
 
         if output == label:
             correct += 1
         total += 1
-
+f1.close()
 print("Test accuracy", correct / total)
