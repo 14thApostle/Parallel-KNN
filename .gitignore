@@ -199,3 +199,6 @@ test_notebooks/
 
 # Datasets
 datasets/
+
+# VSCode
+.vscode
