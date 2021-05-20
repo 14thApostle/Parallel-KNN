@@ -56,7 +56,8 @@ char **str_split(char *a_str, const char a_delim)
     return result;
 }
 
-double distance_fn(double pointa[], double pointb[], int n){
+double distance_fn(double pointa[], double pointb[], int n)
+{
     double dist = 0;
     for (int i = 0; i < n; i++)
     {
@@ -66,17 +67,19 @@ double distance_fn(double pointa[], double pointb[], int n){
     return dist;
 }
 
-int min_distance_centroid(double centroids[][128], double point[]){
+int min_distance_centroid(double centroids[][128], double point[])
+{
     double min_dist = distance_fn(centroids[0], point, 128);
     int min_dist_centroid = 0;
     double dist;
-    
+
     // printf("Dist = %f for centroid %d\n", min_dist, 0);
     for (int i = 1; i < K; i++)
     {
         dist = distance_fn(centroids[i], point, 128);
         // printf("Dist = %f for centroid %d\n", dist, i);
-        if (dist<min_dist){
+        if (dist < min_dist)
+        {
             min_dist = dist;
             min_dist_centroid = i;
         }
@@ -84,12 +87,11 @@ int min_distance_centroid(double centroids[][128], double point[]){
     return min_dist_centroid;
 }
 
-
 int main(int argc, char *argv[])
 {
     int myid, nprocs;
     MPI_Init(NULL, NULL);
-    MPI_Comm_rank(MPI_COMM_WORLD, &myid);	  /* myrank of the process */
+    MPI_Comm_rank(MPI_COMM_WORLD, &myid);   /* myrank of the process */
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs); /* size of the communicator */
 
     printf("Process id %d\n", myid);
@@ -131,11 +133,12 @@ int main(int argc, char *argv[])
 
     // Initialize centroids
     double centroids[K][128];
-    if (myid==0){
+    if (myid == 0)
+    {
         for (int i = 0; i < K; i++)
-        {   
+        {
             // Read file contents
-            char* file_path = files_list[i];
+            char *file_path = files_list[i];
             FILE *fp;
             char line1[1023];
             char line2[10000];
@@ -169,14 +172,14 @@ int main(int argc, char *argv[])
         }
     }
 
-    
-    // Find closest centroid for each datapoint and 
+    // Find closest centroid for each datapoint and
     // find the new centroids by averaging feature vectors
     // of classifications
     for (int iterations = 0; iterations < 10; iterations++)
-    {    
+    {
         // Broadcast centroids to all processes
-        for (int i = 0; i < K; i++){
+        for (int i = 0; i < K; i++)
+        {
             MPI_Bcast(&centroids[i], 128, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         }
 
@@ -190,12 +193,12 @@ int main(int argc, char *argv[])
         }
         int local_new_example_centroids[K] = {0};
 
-        int q = num_train_examples/nprocs;
-        int start = myid*q;
-        for (int i = start; i < start+q; i++)
-        {   
+        int q = num_train_examples / nprocs;
+        int start = myid * q;
+        for (int i = start; i < start + q; i++)
+        {
             // Read file contents
-            char* file_path = files_list[i];
+            char *file_path = files_list[i];
             FILE *fp;
             char line1[1023];
             char line2[10000];
@@ -239,7 +242,7 @@ int main(int argc, char *argv[])
         }
 
         double new_centroids[K][128];
-        if(myid==0)
+        if (myid == 0)
         {
             for (int i = 0; i < K; i++)
                 for (int j = 0; j < 128; j++)
@@ -248,15 +251,14 @@ int main(int argc, char *argv[])
 
         for (int i = 0; i < K; i++)
         {
-            MPI_Reduce(local_new_centroids[i],new_centroids[i],128,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
-        }  
+            MPI_Reduce(local_new_centroids[i], new_centroids[i], 128, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+        }
         int new_example_centroids[K] = {0};
 
+        MPI_Reduce(local_new_example_centroids, new_example_centroids, K, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
-        MPI_Reduce(local_new_example_centroids,new_example_centroids,K,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
-
-        if(myid==0)
-        {   
+        if (myid == 0)
+        {
 
             for (int i = 0; i < K; i++)
                 for (int j = 0; j < 128; j++)
@@ -264,9 +266,11 @@ int main(int argc, char *argv[])
 
             // Find the error values
             double error = 0;
-            for (int i = 0; i < K; i++){
+            for (int i = 0; i < K; i++)
+            {
                 double l_error = distance_fn(new_centroids[i], centroids[i], 128);
-                if (l_error >= error){
+                if (l_error >= error)
+                {
                     error = l_error;
                 }
             }
@@ -277,20 +281,7 @@ int main(int argc, char *argv[])
                 for (int j = 0; j < 128; j++)
                     centroids[i][j] = new_centroids[i][j];
         }
-
     }
-
-
-
-
-    /*
-    TODO
-
-    - We have the array ftr_vectors to train on. (length = headers[2])
-    - Create our KNN instance and perform initialization
-    - Write update rules for each iteration, Gather all outputs before tho
-
-    */
 
     MPI_Finalize();
     return 0;
