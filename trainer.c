@@ -7,6 +7,7 @@
 #include <mpi.h>
 
 #define K 2
+#define threshold 1e-8
 
 char **str_split(char *a_str, const char a_delim)
 {
@@ -85,6 +86,21 @@ int min_distance_centroid(double centroids[][128], double point[])
         }
     }
     return min_dist_centroid;
+}
+
+void save_centroid_values(double centroids[K][128])
+{
+    FILE *fp;
+    fp = fopen("centroids.txt", "w");
+    for (int i = 0; i < K; i++)
+    {
+        for (int j = 0; j < 128; j++)
+        {
+            fprintf(fp, "%f ", centroids[i][j]);
+        }
+        fprintf(fp, "\n");
+    }
+    fclose(fp);
 }
 
 int main(int argc, char *argv[])
@@ -257,6 +273,7 @@ int main(int argc, char *argv[])
 
         MPI_Reduce(local_new_example_centroids, new_example_centroids, K, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
 
+        int done = 0;
         if (myid == 0)
         {
 
@@ -280,8 +297,20 @@ int main(int argc, char *argv[])
             for (int i = 0; i < K; i++)
                 for (int j = 0; j < 128; j++)
                     centroids[i][j] = new_centroids[i][j];
+
+            if (error < threshold)
+            {
+                done = 1;
+            }
+        }
+        MPI_Bcast(&done, 1, MPI_INT, 0, MPI_COMM_WORLD);
+        if (done)
+        {
+            break;
         }
     }
+
+    save_centroid_values(centroids);
 
     MPI_Finalize();
     return 0;
