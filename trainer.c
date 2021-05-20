@@ -71,11 +71,11 @@ int min_distance_centroid(double centroids[][128], double point[]){
     int min_dist_centroid = 0;
     double dist;
     
-    printf("Dist = %f for centroid %d\n", min_dist, 0);
+    // printf("Dist = %f for centroid %d\n", min_dist, 0);
     for (int i = 1; i < K; i++)
     {
         dist = distance_fn(centroids[i], point, 128);
-        printf("Dist = %f for centroid %d\n", dist, i);
+        // printf("Dist = %f for centroid %d\n", dist, i);
         if (dist<min_dist){
             min_dist = dist;
             min_dist_centroid = i;
@@ -84,11 +84,6 @@ int min_distance_centroid(double centroids[][128], double point[]){
     return min_dist_centroid;
 }
 
-struct z
-{
-    int size;
-    double* vec;
-};
 
 int main(int argc, char *argv[])
 {
@@ -103,7 +98,7 @@ int main(int argc, char *argv[])
 
     // Find number of training examples
     int num_train_examples;
-    fp1 = popen("/bin/ls ./datasets/food_1_small_ftrs/train/ | wc -l", "r");
+    fp1 = popen("/bin/ls ./datasets/food_1_ftrs/train/ | wc -l", "r");
     if (fp1 == NULL)
     {
         printf("Failed to run command\n");
@@ -114,7 +109,7 @@ int main(int argc, char *argv[])
     printf("%d Training examples \n", num_train_examples);
 
     // Train files list
-    fp1 = popen("/bin/ls ./datasets/food_1_small_ftrs/train/", "r");
+    fp1 = popen("/bin/ls ./datasets/food_1_ftrs/train/", "r");
     if (fp1 == NULL)
     {
         printf("Failed to run command\n");
@@ -125,7 +120,7 @@ int main(int argc, char *argv[])
     while (fgets(path, sizeof(path), fp1) != NULL)
     {
         path[strcspn(path, "\n")] = 0;
-        char full_path[1035] = "./datasets/food_1_small_ftrs/train/";
+        char full_path[1035] = "./datasets/food_1_ftrs/train/";
         strcat(full_path, path);
         int str_len = strlen(full_path);
         files_list[i] = malloc(sizeof(char) * str_len);
@@ -173,103 +168,116 @@ int main(int argc, char *argv[])
             fclose(fp);
         }
     }
-    // Broadcast centroids to all processes
-    for (int i = 0; i < 2; i++){
-        MPI_Bcast(&centroids[i], 128, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    }
+
     
     // Find closest centroid for each datapoint and 
     // find the new centroids by averaging feature vectors
     // of classifications
-
-    double local_new_centroids[K][128];
-    for (int i = 0; i < K; i++)
-    {
-        for (int j = 0; j < 128; j++)
-        {
-            local_new_centroids[i][j] = 0;
-        }
-    }
-    int local_new_example_centroids[K] = {0};
-
-    int q = num_train_examples/nprocs;
-    int start = myid*q;
-    for (int i = start; i < start+q; i++)
-    {   
-        // Read file contents
-        char* file_path = files_list[i];
-        FILE *fp;
-        char line1[1023];
-        char line2[10000];
-
-        printf("The %d train file: %s\n", 0, file_path);
-        fp = fopen(file_path, "r");
-        if (fp == NULL)
-        {
-            printf("Fail");
-            exit(EXIT_FAILURE);
+    for (int iterations = 0; iterations < 10; iterations++)
+    {    
+        // Broadcast centroids to all processes
+        for (int i = 0; i < K; i++){
+            MPI_Bcast(&centroids[i], 128, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         }
 
-        fgets(line1, sizeof(line1), fp);
-        line1[strcspn(line1, "\n")] = 0;
-        fgets(line2, sizeof(line2), fp);
-
-        // Headers are some information stored in the txt file
-        // Format (image_id, class_name, len_feature_vector)
-        char **headers;
-        headers = str_split(line1, ' ');
-        // for (int j = 0; j < 3; j++)
-        // {
-        //     printf("The %d header is : %s\n", j, headers[j]);
-        // }
-
-        char **t_vectors;
-        t_vectors = str_split(line2, ' ');
-        double ftr_vectors[10000];
-        for (int j = 0; j < atoi(headers[2]); j++)
-        {
-            ftr_vectors[j] = strtod(t_vectors[j], NULL);
-        }
-        int centroid_id = min_distance_centroid(centroids, ftr_vectors);
-        local_new_example_centroids[centroid_id] += 1;
-        for (int j = 0; j < 128; j++)
-        {
-            local_new_centroids[centroid_id][j] += ftr_vectors[j];
-        }
-        printf("Closest centroid is %d\n", centroid_id);
-        fclose(fp);
-    }
-
-    double new_centroids[K][128];
-    if(myid==0)
-    {
+        double local_new_centroids[K][128];
         for (int i = 0; i < K; i++)
+        {
             for (int j = 0; j < 128; j++)
-                new_centroids[i][j] = 0;
-    }
+            {
+                local_new_centroids[i][j] = 0;
+            }
+        }
+        int local_new_example_centroids[K] = {0};
 
-    for (int i = 0; i < K; i++)
-    {
-        MPI_Reduce(local_new_centroids[i],new_centroids[i],128,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
-    }  
-    int new_example_centroids[K] = {0};
+        int q = num_train_examples/nprocs;
+        int start = myid*q;
+        for (int i = start; i < start+q; i++)
+        {   
+            // Read file contents
+            char* file_path = files_list[i];
+            FILE *fp;
+            char line1[1023];
+            char line2[10000];
 
-    printf("Prev examples [0]=%d, [1]=%d\n",local_new_example_centroids[0],local_new_example_centroids[1]);
+            // printf("The %d train file: %s\n", 0, file_path);
+            fp = fopen(file_path, "r");
+            if (fp == NULL)
+            {
+                printf("Fail");
+                exit(EXIT_FAILURE);
+            }
 
-    MPI_Reduce(local_new_example_centroids,new_example_centroids,K,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+            fgets(line1, sizeof(line1), fp);
+            line1[strcspn(line1, "\n")] = 0;
+            fgets(line2, sizeof(line2), fp);
 
+            // Headers are some information stored in the txt file
+            // Format (image_id, class_name, len_feature_vector)
+            char **headers;
+            headers = str_split(line1, ' ');
+            // for (int j = 0; j < 3; j++)
+            // {
+            //     printf("The %d header is : %s\n", j, headers[j]);
+            // }
 
-    if(myid==0)
-    {   
-        printf("Total examples [0]=%d, [1]=%d\n",new_example_centroids[0],new_example_centroids[1]);
+            char **t_vectors;
+            t_vectors = str_split(line2, ' ');
+            double ftr_vectors[10000];
+            for (int j = 0; j < atoi(headers[2]); j++)
+            {
+                ftr_vectors[j] = strtod(t_vectors[j], NULL);
+            }
+            int centroid_id = min_distance_centroid(centroids, ftr_vectors);
+            local_new_example_centroids[centroid_id] += 1;
+            for (int j = 0; j < 128; j++)
+            {
+                local_new_centroids[centroid_id][j] += ftr_vectors[j];
+            }
+            // printf("Closest centroid is %d\n", centroid_id);
+            fclose(fp);
+        }
+
+        double new_centroids[K][128];
+        if(myid==0)
+        {
+            for (int i = 0; i < K; i++)
+                for (int j = 0; j < 128; j++)
+                    new_centroids[i][j] = 0;
+        }
 
         for (int i = 0; i < K; i++)
-            for (int j = 0; j < 128; j++)
-                new_centroids[i][j] /= new_example_centroids[i];
+        {
+            MPI_Reduce(local_new_centroids[i],new_centroids[i],128,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
+        }  
+        int new_example_centroids[K] = {0};
 
-        for(int j = 0; j < 10; j++){
-            printf("New centroid[0][%d] = %f\n",j, new_centroids[0][j]);
+
+        MPI_Reduce(local_new_example_centroids,new_example_centroids,K,MPI_INT,MPI_SUM,0,MPI_COMM_WORLD);
+
+        if(myid==0)
+        {   
+
+            for (int i = 0; i < K; i++)
+                for (int j = 0; j < 128; j++)
+                    new_centroids[i][j] /= new_example_centroids[i];
+
+            // Find the error values
+            double error = 0;
+            for (int i = 0; i < K; i++){
+                double l_error = distance_fn(new_centroids[i], centroids[i], 128);
+                if (l_error >= error){
+                    error = l_error;
+                }
+            }
+            printf("Error after %d is %f\n", iterations, error);
+
+            // Update the centroids
+            for (int i = 0; i < K; i++)
+                for (int j = 0; j < 128; j++)
+                    centroids[i][j] = new_centroids[i][j];
         }
+
     }
 
 
