@@ -171,7 +171,7 @@ for class_name in os.listdir(train_dir):
         f = open(path, "w")
         f.write(
             " ".join(
-                [str(i) for i in [img_id, class_name, len(ftr_vector.flatten()), "\n"]]
+                [str(i) for i in [img_id, str(class_names.index(class_name)), len(ftr_vector.flatten()), "\n"]]
             )
         )
         for val in ftr_vector.flatten():
