@@ -8,6 +8,7 @@ from tensorflow.keras.models import Sequential
 from PIL import Image
 import shutil
 import argparse
+import csv
 
 import utils
 
@@ -75,7 +76,7 @@ if opt.plt_dataset and not opt.no_plts:
 
 AUTOTUNE = tf.data.AUTOTUNE
 
-train_ds = train_ds.cache().shuffle(1000).prefetch(buffer_size=AUTOTUNE)
+train_ds = train_ds.cache().shuffle(10).prefetch(buffer_size=AUTOTUNE)
 val_ds = val_ds.cache().prefetch(buffer_size=AUTOTUNE)
 normalization_layer = layers.experimental.preprocessing.Rescaling(1.0 / 255)
 
@@ -105,7 +106,7 @@ model.compile(
 )
 model.summary()
 
-epochs = 2
+epochs = 1
 history = model.fit(train_ds, validation_data=val_ds, epochs=epochs)
 
 acc = history.history["accuracy"]
@@ -144,6 +145,7 @@ feature_xtr = tf.keras.models.Model(
 )
 
 root_path = root_dataset_dir + "_ftrs"
+print("New dataset at", root_dataset_dir)
 if os.path.exists(root_path):
     shutil.rmtree(root_path)
 os.makedirs(root_path)
@@ -154,7 +156,11 @@ os.makedirs(join(root_path, "test"))
 correct = 0
 total = 0
 
-f1 = open(join(root_path, "train" + ".txt"), "w")
+# f1 = open(join(root_path, "train" + ".txt"), "w")
+f1 = open(join(root_path, "train" + ".csv"), 'w')
+writer = csv.writer(f1)
+writer.writerow(["Class id"]+['ftr_'+ str(i) for i in range(128)])
+
 for class_name in os.listdir(train_dir):
     print("Converting train", class_name, "images")
     label = class_names.index(class_name)
@@ -178,9 +184,10 @@ for class_name in os.listdir(train_dir):
             f.write(str(val) + " ")
         f.close()
 
-        for val in ftr_vector.flatten():
-            f1.write(str(val) + " ")
-        f1.write(str(class_names.index(class_name)) + "\n")
+        # for val in ftr_vector.flatten():
+        #     f1.write(str(val) + " ")
+        writer.writerow([str(class_names.index(class_name))] + [val for val in ftr_vector.flatten()])
+        # f1.write(str(class_names.index(class_name)) + "\n")
 
         if output == label:
             correct += 1
@@ -191,7 +198,11 @@ print("Train accuracy", correct / total)
 ## Test
 correct = 0
 total = 0
-f1 = open(join(root_path, "test" + ".txt"), "w")
+# f1 = open(join(root_path, "test" + ".txt"), "w")
+f1 = open(join(root_path, "test" + ".csv"), 'w')
+writer = csv.writer(f1)
+writer.writerow(["Class id"]+['ftr_'+ str(i) for i in range(128)])
+
 for class_name in os.listdir(test_dir):
     print("Converting test", class_name, "images")
     label = class_names.index(class_name)
@@ -215,9 +226,10 @@ for class_name in os.listdir(test_dir):
             f.write(str(val) + " ")
         f.close()
 
-        for val in ftr_vector.flatten():
-            f1.write(str(val) + " ")
-        f1.write(str(class_names.index(class_name)) + "\n")
+        # for val in ftr_vector.flatten():
+        #     f1.write(str(val) + " ")
+        writer.writerow([str(class_names.index(class_name))] + [val for val in ftr_vector.flatten()])
+        # f1.write(str(class_names.index(class_name)) + "\n")
 
         if output == label:
             correct += 1
